@@ -1,22 +1,23 @@
-const reshape = require('reshape')
-const customElements = require('reshape-custom-elements')
-const test = require('ava')
-const path = require('path')
-const {readFileSync} = require('fs')
-const generator = require('..')
-const parser = require('reshape-parser')
+import reshape from 'reshape'
+import customElements from 'reshape-custom-elements'
+import test from 'ava'
+import path from 'path'
+import {readFileSync} from 'fs'
+import generator from '..'
+import parser from 'reshape-parser'
+
 const fixtures = path.join(__dirname, 'fixtures')
 
-test('basic', (t) => {
+test('basic', t => {
   const html = readFileSync(path.join(fixtures, 'basic.html'), 'utf8')
   return reshape({ plugins: customElements(), generator, parser })
     .process(html)
     .then((res) => {
-      t.truthy(res.output().trim() === '<p wow="foo" bar="asd">hello world</p>')
+      t.is(res.output().trim(), 'p(wow="foo" bar="asd") hello world')
     })
 })
 
-test('code', (t) => {
+test('code', t => {
   const res = generator([
     {
       type: 'tag',
@@ -29,20 +30,20 @@ test('code', (t) => {
       ]
     }
   ])
-  t.truthy(res({ planet: 'world' }) === '<p foo="bar">hello world!</p>')
+  t.truthy(res({ planet: 'world' }) === 'p(foo="bar") hello world!')
 })
 
-test('comment', (t) => {
+test('comment', t => {
   const res = generator([
     {
       type: 'comment',
       content: 'test comment'
     }
   ])
-  t.truthy(res() === '<!-- test comment -->')
+  t.truthy(res() === '// test comment')
 })
 
-test('runtime', (t) => {
+test('runtime', t => {
   const runtime = { changeToDoge: (input) => 'doge' }
   const res = generator.call({ runtime }, [
     { type: 'text', content: 'it\'s a ' },
@@ -52,7 +53,7 @@ test('runtime', (t) => {
   t.truthy(res() === 'it\'s a doge!')
 })
 
-test('customized runtime name', (t) => {
+test('customized runtime name', t => {
   const runtime = { changeToDoge: (input) => 'doge' }
   const res = generator.call({ runtime }, [
     { type: 'text', content: 'it\'s a ' },
@@ -62,7 +63,7 @@ test('customized runtime name', (t) => {
   t.truthy(res() === 'it\'s a doge!')
 })
 
-test('return string option', (t) => {
+test('return string option', t => {
   const res = generator([
     { type: 'text', content: 'hello' }
   ], { returnString: true })
@@ -70,7 +71,7 @@ test('return string option', (t) => {
   t.truthy(eval(res)() === 'hello') // eslint-disable-line
 })
 
-test('runtime with return string', (t) => {
+test('runtime with return string', t => {
   const res = generator([
     { type: 'code', content: '__runtime.changeToDoge("cate")' }
   ], { returnString: true })
@@ -79,7 +80,7 @@ test('runtime with return string', (t) => {
   t.truthy(eval(res)() === 'doge') // eslint-disable-line
 })
 
-test('nested elements', (t) => {
+test('nested elements', t => {
   const res = generator([
     {
       type: 'tag',
@@ -100,39 +101,72 @@ test('nested elements', (t) => {
       ]
     }
   ])
-  t.truthy(res() === '<l1><l2><l3>l3 text</l3>l2 text</l2></l1>')
+  t.is(
+    res(), 
+`l1
+  l2
+    l3 l3 text
+    | l2 text`
+  )
 })
 
-test('self-closing tags', (t) => {
+test('self-closing tags', t => {
   const res = generator([{ type: 'tag', name: 'br' }])
-  t.truthy(res() === '<br>')
+  t.truthy(res() === 'br')
 })
 
-test('alternate self-closing options', (t) => {
+test('alternate self-closing options', t => {
   const brTree = [{ type: 'tag', name: 'br' }]
   const r1 = generator(brTree, { selfClosing: 'slash' })
   const r2 = generator(brTree, { selfClosing: 'tag' })
   const r3 = generator(brTree, { selfClosing: 'close' })
 
-  t.truthy(r1() === '<br />')
-  t.truthy(r2() === '<br></br>')
-  t.truthy(r3() === '<br>')
+  t.truthy(r1() === 'br /')
+  t.truthy(r2() === 'br')
+  t.truthy(r3() === 'br')
 })
 
-test('self-closing invalid option', (t) => {
+test('self-closing invalid option', t => {
   t.throws(() => generator([], { selfClosing: 'snargle' }), "'snargle' is an invalid option for 'selfClosing'. You can use 'close', 'tag', or 'slash'")
 })
 
-test('single attribute', (t) => {
+test('single attribute', t => {
+  const res = generator([{
+    type: 'tag',
+    name: 'div',
+    attrs: { foo: { type: 'text', content: 'test' } }
+  }])
+  t.is(res(), 'div(foo="test")')
+})
+
+test('static id', t => {
   const res = generator([{
     type: 'tag',
     name: 'div',
     attrs: { id: { type: 'text', content: 'test' } }
   }])
-  t.truthy(res() === '<div id="test"></div>')
+  t.is(res(), 'div#test')
 })
 
-test('multiple attributes', (t) => {
+test('dynamic id', t => {
+  const res = generator([{
+    type: 'tag',
+    name: 'div',
+    attrs: { id: { type: 'code', content: 'id' } }
+  }])
+  t.is(res({id: 'foobar'}), 'div(id="foobar")')
+})
+
+test('static classes', t => {
+  const res = generator([{
+    type: 'tag',
+    name: 'div',
+    attrs: { class: { type: 'text', content: 'class' } }
+  }])
+  t.is(res(), 'div.class')
+})
+
+test('multiple attributes', t => {
   const res = generator([{
     type: 'tag',
     name: 'div',
@@ -141,10 +175,10 @@ test('multiple attributes', (t) => {
       foo: { type: 'text', content: 'bar' }
     }
   }])
-  t.truthy(res() === '<div id="test" foo="bar"></div>')
+  t.is(res(), 'div#test(foo="bar")')
 })
 
-test('boolean attributes', (t) => {
+test('boolean attributes', t => {
   const res = generator([{
     type: 'tag',
     name: 'input',
@@ -153,10 +187,10 @@ test('boolean attributes', (t) => {
       checked: { type: 'text', content: '' }
     }
   }])
-  t.truthy(res() === '<input type="checkbox" checked>')
+  t.truthy(res() === 'input(type="checkbox" checked)')
 })
 
-test('code in attribute', (t) => {
+test('code in attribute', t => {
   const res = generator([{
     type: 'tag',
     name: 'div',
@@ -164,10 +198,10 @@ test('code in attribute', (t) => {
       code: { type: 'code', content: 'foo' }
     }
   }])
-  t.truthy(res({ foo: 'bar' }) === '<div code="bar"></div>')
+  t.truthy(res({ foo: 'bar' }) === 'div(code="bar")')
 })
 
-test('code and string in attribute', (t) => {
+test('code and string in attribute', t => {
   const res = generator([{
     type: 'tag',
     name: 'div',
@@ -178,12 +212,12 @@ test('code and string in attribute', (t) => {
       ]
     }
   }])
-  t.truthy(res({ foo: 'bar' }) === '<div code="class-bar"></div>')
+  t.truthy(res({ foo: 'bar' }) === 'div(code="class-bar")')
 })
 
 // technically, this would need to be wrapped in parens to be an expression
 // but we auto-wrap in the code gen
-test('non-expression still works as expected', (t) => {
+test('non-expression still works as expected', t => {
   const res = generator([{
     type: 'code',
     content: '1 + 1'
@@ -192,7 +226,7 @@ test('non-expression still works as expected', (t) => {
 })
 
 // not adviseable, but valid
-test('tag in attribute', (t) => {
+test('tag in attribute', t => {
   const res = generator([{
     type: 'tag',
     name: 'div',
@@ -202,10 +236,10 @@ test('tag in attribute', (t) => {
       ]
     }
   }])
-  t.truthy(res() === '<div code="<p></p>"></div>')
+  t.is(res(), 'div(code="p")')
 })
 
-test('only one code node', (t) => {
+test('only one code node', t => {
   const res = generator([{
     type: 'code',
     content: 'foo'
@@ -213,7 +247,7 @@ test('only one code node', (t) => {
   t.truthy(res({ foo: 'bar' }) === 'bar')
 })
 
-test('two code nodes in a row', (t) => {
+test('two code nodes in a row', t => {
   const res = generator([{
     type: 'code',
     content: 'foo'
@@ -224,7 +258,7 @@ test('two code nodes in a row', (t) => {
   t.truthy(res({ foo: 'bar', wow: 'amaze' }) === 'baramaze')
 })
 
-test('__nodes code helper', (t) => {
+test('__nodes code helper', t => {
   const res = generator([{
     type: 'code',
     content: 'true ? __nodes[0] : __nodes[1]',
@@ -245,7 +279,7 @@ test('__nodes code helper', (t) => {
   t.truthy(res2() === 'lies')
 })
 
-test('scopedLocals option', (t) => {
+test('scopedLocals option', t => {
   const res = generator([{
     type: 'code',
     content: 'locals.foo'
@@ -253,7 +287,7 @@ test('scopedLocals option', (t) => {
   t.truthy(res({ foo: 'bar' }) === 'bar')
 })
 
-test('unrecognized node type', (t) => {
+test('unrecognized node type', t => {
   const tree = [{
     type: 'snargle',
     content: 'foo'
