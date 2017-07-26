@@ -5,8 +5,58 @@ import path from 'path'
 import {readFileSync} from 'fs'
 import generator from '..'
 import parser from 'reshape-parser'
+import sugarml from 'sugarml'
 
 const fixtures = path.join(__dirname, 'fixtures')
+
+const sugarml2sugarml = (code, locals={}) => {
+  return reshape({parser: sugarml, generator})
+    .process(code)
+    .then(res => res.output(locals))
+    .then(c => c.trim())
+}
+
+const html2sugarml = (code, locals={}) => {
+  return reshape({generator})
+    .process(code)
+    .then(res => res.output(locals))
+    .then(c => c.trim())
+}
+
+test('doctype', async t => {
+  t.is(
+    await html2sugarml('<!DOCTYPE html>'),
+    'doctype html'
+  )
+})
+
+test('complex doctype', async t => {
+  t.is(
+    await html2sugarml('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">'),
+    'doctype html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd"'
+  )
+})
+
+test('nested html', async t => {
+  const html = `
+<html>
+  <head>
+    <title>foo</title>
+  </head>
+  <body>
+    <h1>hi</h1>
+  </body>
+</html>
+`
+  const sgr = `
+html
+  head
+    title foo
+  body
+    h1 hi
+`
+  t.is(await html2sugarml(html), sgr.trim())
+})
 
 test('basic', t => {
   const html = readFileSync(path.join(fixtures, 'basic.html'), 'utf8')
@@ -80,6 +130,42 @@ test('runtime with return string', t => {
   t.truthy(eval(res)() === 'doge') // eslint-disable-line
 })
 
+test('simple render', async t => {
+  const input =
+`
+div
+`
+  t.is(await sugarml2sugarml(input), input.trim())
+})
+
+test('classes', async t => {
+  const input =
+`
+div.foo.bar
+`
+  t.is(await sugarml2sugarml(input), input.trim())
+})
+
+test('id', async t => {
+  const input =
+`
+div#foobar
+`
+  t.is(await sugarml2sugarml(input), input.trim())
+})
+
+test('id', async t => {
+  const input =
+`
+<div id="foobar"></div>
+`
+  const output =
+`
+div#foobar
+`
+  t.is(await html2sugarml(input), output.trim())
+})
+
 test('nested elements', t => {
   const res = generator([
     {
@@ -139,43 +225,9 @@ test('single attribute', t => {
   t.is(res(), 'div(foo="test")')
 })
 
-test('static id', t => {
-  const res = generator([{
-    type: 'tag',
-    name: 'div',
-    attrs: { id: { type: 'text', content: 'test' } }
-  }])
-  t.is(res(), 'div#test')
-})
-
-test('dynamic id', t => {
-  const res = generator([{
-    type: 'tag',
-    name: 'div',
-    attrs: { id: { type: 'code', content: 'id' } }
-  }])
-  t.is(res({id: 'foobar'}), 'div(id="foobar")')
-})
-
-test('static classes', t => {
-  const res = generator([{
-    type: 'tag',
-    name: 'div',
-    attrs: { class: { type: 'text', content: 'class' } }
-  }])
-  t.is(res(), 'div.class')
-})
-
-test('multiple attributes', t => {
-  const res = generator([{
-    type: 'tag',
-    name: 'div',
-    attrs: {
-      id: { type: 'text', content: 'test' },
-      foo: { type: 'text', content: 'bar' }
-    }
-  }])
-  t.is(res(), 'div#test(foo="bar")')
+test('multiple attributes', async t => {
+  const res = await html2sugarml("<div id='test' foo='bar'></div>")
+  t.is(res, 'div#test(foo="bar")')
 })
 
 test('boolean attributes', t => {

@@ -1,14 +1,12 @@
 {
-  "name": "reshape-code-gen",
-  "description": "converts a reshape ast into a javascript function",
-  "version": "0.2.1",
-  "author": "Jeff Escalante",
-  "ava": {
-    "verbose": "true"
-  },
+  "name": "reshape-code-gen-sugarml",
+  "description": "converts a reshape ast into a javascript function that turns into sugarml",
+  "version": "0.0.0",
+  "author": "Caleb Eby",
   "bugs": "https://github.com/reshape/code-gen/issues",
   "dependencies": {
     "objectfn": "^2.0.0",
+    "sugarml": "^0.6.0",
     "with": "^5.1.1"
   },
   "devDependencies": {
